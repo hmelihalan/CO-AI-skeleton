@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.*.local
+!.env.example
+coverage/
+playwright-report/
+test-results/
+tmp/
+.uv-cache/
+*.tsbuildinfo
+npm-debug.log*
+.DS_Store
