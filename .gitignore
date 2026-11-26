@@ -1,5 +1,7 @@
 node_modules/
 .next/
+.postgres-data/
+.pg-init-password
 .env
 .env.local
 .env.*.local

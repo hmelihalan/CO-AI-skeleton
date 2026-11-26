@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "db:test:prepare": "node scripts/prepare-test-db.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

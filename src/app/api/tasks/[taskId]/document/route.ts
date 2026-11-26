@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { saveDraft } from "@/lib/workspace";
+import { saveDocument } from "@/lib/workspace";
 import {
-  draftPayloadSchema,
+  documentPayloadSchema,
   MAX_REQUEST_BYTES,
   taskIdSchema,
 } from "@/lib/validation";
@@ -28,18 +28,17 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "The request is too large." }, { status: 413 });
     }
 
-    const body = draftPayloadSchema.parse(JSON.parse(rawBody));
-    const draft = await saveDraft(taskId, body.content);
-
-    if (!draft) {
-      return NextResponse.json({ error: "The requested task was not found." }, { status: 404 });
-    }
+    const payload = documentPayloadSchema.parse(JSON.parse(rawBody));
+    const workspace = await saveDocument(taskId, payload);
 
     return NextResponse.json({
-      draft: {
-        content: draft.content,
-        updatedAt: draft.updatedAt.toISOString(),
-      },
+      document: workspace?.document
+        ? {
+            ...workspace.document,
+            updatedAt: workspace.document.updatedAt.toISOString(),
+          }
+        : null,
+      progress: workspace?.progress,
     });
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -53,9 +52,20 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       );
     }
 
-    console.error("Unable to save draft", error);
+    if (error instanceof Error && error.message === "TASK_NOT_FOUND") {
+      return NextResponse.json({ error: "The requested task was not found." }, { status: 404 });
+    }
+
+    if (error instanceof Error && error.message === "TEMPLATE_VERSION_MISMATCH") {
+      return NextResponse.json(
+        { error: "This document is tied to a different template version." },
+        { status: 409 },
+      );
+    }
+
+    console.error("Unable to save SRS document", error);
     return NextResponse.json(
-      { error: "The draft could not be saved. Check the database connection and retry." },
+      { error: "The document could not be saved. Your unsaved changes are still in the editor." },
       { status: 503 },
     );
   }

@@ -8,6 +8,13 @@
       "when": 1795701956676,
       "tag": "0000_watery_jocasta",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795701956677,
+      "tag": "0001_template_srs_editor",
+      "breakpoints": true
     }
   ]
 }

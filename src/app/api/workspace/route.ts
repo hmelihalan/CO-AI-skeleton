@@ -16,11 +16,11 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      task: workspace.task,
-      draft: workspace.draft
+      ...workspace,
+      document: workspace.document
         ? {
-            content: workspace.draft.content,
-            updatedAt: workspace.draft.updatedAt.toISOString(),
+            ...workspace.document,
+            updatedAt: workspace.document.updatedAt.toISOString(),
           }
         : null,
     });
