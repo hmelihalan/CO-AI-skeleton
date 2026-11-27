@@ -10,7 +10,11 @@ coverage/
 playwright-report/
 test-results/
 tmp/
+output/
 .uv-cache/
 *.tsbuildinfo
+*.pdf
+*.pptx
+*.drawio*.html
 npm-debug.log*
 .DS_Store

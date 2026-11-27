@@ -17,9 +17,8 @@ export type SrsTemplate = {
   sections: readonly SrsTemplateSection[];
 };
 
-// Source of truth: sources.md -> Figma file 319u5TOumHmdU38pceGrjp,
+// Source: Figma file 319u5TOumHmdU38pceGrjp,
 // frame "02 · Task instructions" (node 2:506), text node 2:523.
-// The project SDD PDFs are design documentation, not the student template.
 export const STUDENT_SRS_TEMPLATE = {
   templateId: "coai-campus-room-srs",
   version: "1.0.0",

@@ -1,112 +1,84 @@
-# CO-AI template-based SRS editor
+# CO-AI running skeleton
 
-This running skeleton implements one real UI → API → PostgreSQL path for authoring an SRS from a fixed, versioned student template. It supports section-by-section editing, requirement CRUD, explicit completion states, calculated document progress, atomic saving, and reload restoration.
+This repository contains a working vertical slice of a template-based Software Requirements Specification (SRS) editor. It connects a Next.js App Router interface to route handlers and PostgreSQL, with schema validation and browser tests covering the core authoring flow.
 
-No AI call, staff panel, analytics, grading, submission locking, or localStorage persistence is included.
+The skeleton deliberately excludes AI calls, authentication, staff tools, analytics, grading, submission locking, and `localStorage` persistence.
 
-## Template source and document distinction
+## What is implemented
 
-The repository source index is [sources.md](sources.md). It points to Figma file `319u5TOumHmdU38pceGrjp`.
-
-The student template used by the editor is the **“Include these five sections”** definition in the Figma frame **`02 · Task instructions` (node `2:506`)**, specifically text node `2:523`:
-
-1. Introduction
-2. Overall Description
-3. Functional Requirements
-4. External Interfaces
-5. Nonfunctional Requirements
-
-The matching Figma workspace supplies the visual reference and examples. Examples and explanations appear only in the right-side help area; they are never inserted as student answers.
-
-`SENG491_Group11_SDD.pdf` and `SENG491_Group11_SDD (1).pdf` are copies of the project’s own **CO-AI Software Design Description**. They are not student SRS templates. `TRAWIS–HGAI Website Workflow (1).pptx` describes a separate research workflow and is also not used as the student template.
-
-The normalized template definition lives in [src/lib/srs-template.ts](src/lib/srs-template.ts). Its stable identity is `coai-campus-room-srs@1.0.0`. The source template has five flat, fillable sections and does not authorize a “Not applicable” state, so the implementation does not invent subsections or N/A behavior.
-
-## Implemented behavior
-
-- The left rail shows the SRS template root and its five ordered section leaves.
-- Clicking a section opens its independent response without losing unsaved responses in other sections.
-- Previous and Next follow template order and are disabled at the first and last sections.
-- Sections 3–5 support adding, editing, and deleting requirements.
-- Every requirement has a persistent UUID internal ID and an editable visible code.
-- Requirement codes are unique across the entire document, case-insensitively, in both UI and server validation.
-- Template guidance and examples stay separate from student content.
-- Unsaved, saving, saved, and failed states are explicit. “Saved” appears only after PostgreSQL commits successfully.
-- A failed save leaves all client-side content intact.
-
-### Progress semantics
-
-Every fillable section has exactly one state:
-
-- **Not started** — no section notes and no requirements.
-- **In progress** — content exists but the user has not explicitly completed the section.
-- **Completed** — content exists and the user selected **Mark as complete**.
-
-An empty section cannot be completed. **Reopen section** returns a completed section to In progress. Editing or deleting content in a completed section immediately returns it to In progress; removing all content returns it to Not started.
-
-Progress is:
-
-```text
-completed fillable sections / 5 fillable sections
-```
-
-The UI derives both the percentage and `X / 5 sections completed` from section state. It is document-completion progress, not a quality score or grade. The API never accepts a client-supplied percentage.
-
-## Persistence model
-
-Template definitions and student data are separate:
-
-- `src/lib/srs-template.ts` — immutable template definition and help content.
-- `srs_documents` — task binding plus the template ID/version the document started with.
-- `srs_section_responses` — content and completion state keyed by stable `section_id`.
-- `srs_requirements` — persistent UUID, stable section ID, editable visible code, text, and order.
-
-`PUT /api/tasks/{taskId}/document` validates:
-
-- task UUID;
-- exact template identity/version;
-- the complete known section-ID set;
-- allowed requirement sections;
-- requirement UUIDs;
-- non-empty requirement codes/text;
-- document-wide case-insensitive code uniqueness;
-- server-derived state transitions.
-
-The save runs in one PostgreSQL transaction. Section responses, completion states, requirements, and the document timestamp commit together or roll back together. When previously completed content differs from the saved snapshot, the server forces that section back to In progress even if a client tries to submit Completed.
-
-`GET /api/workspace` returns the task, template definition, saved document, and server-calculated progress. A document remains bound to its original template ID/version.
+- Five ordered SRS sections defined by the versioned template in `src/lib/srs-template.ts`
+- Independent section notes with Previous and Next navigation
+- Requirement create, update, and delete operations in sections 3–5
+- Document-wide, case-insensitive requirement-code uniqueness
+- Explicit Not started, In progress, and Completed section states
+- Server-calculated progress based on completed sections
+- Atomic PostgreSQL saves and reload restoration
+- UI and server validation for IDs, template versions, section sets, requirements, and state transitions
+- End-to-end coverage with Playwright against a dedicated PostgreSQL test database
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    UI[Next.js section editor] -->|GET /api/workspace| API[Next.js route handlers]
+    UI[Next.js section editor] -->|GET /api/workspace| API[App Router route handlers]
     UI -->|PUT /api/tasks/:id/document| API
-    API --> VALIDATION[Zod IDs, template, states, codes]
-    VALIDATION --> TX[Atomic Drizzle transaction]
+    API --> VALIDATION[Zod validation]
+    VALIDATION --> TX[Drizzle transaction]
     TX --> DB[(PostgreSQL)]
 ```
 
-Only server modules import the PostgreSQL pool. There is no localStorage or in-memory persistence fallback.
+Only server-side modules access the PostgreSQL pool. A save commits the section responses, completion states, requirements, and document timestamp together, or rolls them all back.
 
-## Setup
+## Progress rules
 
-Requirements:
+Each section has one state:
+
+- **Not started:** no notes or requirements
+- **In progress:** content exists, but the section is not explicitly complete
+- **Completed:** content exists and the user selected **Mark as complete**
+
+An empty section cannot be completed. Editing completed content reopens that section automatically. Progress is calculated as:
+
+```text
+completed sections / 5 sections
+```
+
+The percentage is document-completion progress, not a quality score or grade. The API does not accept a client-supplied percentage.
+
+## Project structure
+
+```text
+src/app/                 Pages, layout, and API route handlers
+src/components/          SRS workspace interface
+src/db/                  Drizzle schema and PostgreSQL connection
+src/lib/                 Template, validation, and workspace logic
+drizzle/                 SQL migrations and migration metadata
+scripts/                 Database migration, seed, and test preparation
+tests/e2e/               Playwright browser tests
+docs/evidence/           Browser-test screenshots
+```
+
+The normalized template identity is `coai-campus-room-srs@1.0.0`. Student responses are stored separately from that immutable template definition.
+
+## Requirements
 
 - Node.js 20.9 or newer
-- PostgreSQL 17 (the included Compose file uses `postgres:17.7-alpine`)
 - npm
+- Docker with Docker Compose, or a compatible PostgreSQL 17 instance
 
-Install dependencies and start PostgreSQL:
+## Local setup
+
+Install dependencies and create a local environment file:
 
 ```powershell
 npm install
-docker compose up -d
+Copy-Item .env.example .env
 ```
 
-Set the database URL for migration and seed scripts, then prepare the database:
+Start PostgreSQL, then migrate and seed the database:
 
 ```powershell
+docker compose up -d
 $env:DATABASE_URL = "postgresql://coai:coai_local_password@localhost:5432/coai"
 npm run db:migrate
 npm run db:seed
@@ -118,11 +90,27 @@ Start the application:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Next.js reads `.env` for the development server; the explicit PowerShell variable above is needed by the standalone migration and seed scripts.
+Open [http://localhost:3000](http://localhost:3000).
+
+Next.js loads `DATABASE_URL` from the root `.env` file for the application. The migration and seed commands are standalone scripts, so set `DATABASE_URL` in the shell before running them.
+
+## Available commands
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run build` | Create a production build |
+| `npm run start` | Run the production build |
+| `npm run lint` | Run ESLint |
+| `npm run typecheck` | Run TypeScript without emitting files |
+| `npm run db:migrate` | Apply database migrations |
+| `npm run db:seed` | Seed the fixed skeleton task |
+| `npm run db:test:prepare` | Recreate the dedicated test database |
+| `npm run test:e2e` | Run the Playwright browser suite |
 
 ## Verification
 
-Static and production checks:
+Run the static and production checks:
 
 ```powershell
 npm run lint
@@ -130,7 +118,7 @@ npm run typecheck
 npm run build
 ```
 
-Prepare the dedicated real PostgreSQL test database and run the browser suite:
+Prepare the dedicated test database and run the browser suite:
 
 ```powershell
 npm run db:test:prepare
@@ -140,34 +128,17 @@ npm run db:seed
 npm run test:e2e
 ```
 
-The suite resets only `srs_documents` in `coai_test` before each test; cascading foreign keys clear its section and requirement rows. It refuses to run against any database not named `coai_test`.
+The test suite refuses to run against a database whose name is not `coai_test`. It covers section state and progress, save/reload restoration, unsaved navigation, requirement operations and validation, rejected invalid payloads, and failed-save recovery.
 
-The tests cover:
+## API summary
 
-- an empty document at 0%;
-- typing changes a section to In progress;
-- explicit completion updates count and percentage;
-- save/reload restores content, completion, and progress;
-- editing completed content returns it to In progress;
-- empty sections cannot be completed;
-- switching sections preserves unsaved content;
-- requirement add/edit/delete and duplicate-code validation;
-- unknown section IDs and duplicate codes are rejected server-side;
-- an intentional PostgreSQL trigger failure returns 503, preserves client content, and shows an error.
+- `GET /api/workspace` returns the fixed task, template definition, saved document, and server-calculated progress.
+- `PUT /api/tasks/{taskId}/document` validates and atomically saves the full document.
 
-## Delivery evidence
+## Current limitations
 
-- [Empty versioned template at 0%](docs/evidence/01-empty-template.png)
-- [Completed section saved to PostgreSQL at 20%](docs/evidence/02-section-completed.png)
-- [Saved content and progress restored after reload](docs/evidence/03-saved-document-restored.png)
-- [Save error with unsaved content preserved](docs/evidence/04-save-error-preserves-content.png)
-
-These screenshots are generated by the real-browser suite at a 1280 × 720 viewport.
-
-## Limitations
-
-- Authentication and participant isolation are intentionally absent; one fixed synthetic task is used.
-- The template registry currently contains only `coai-campus-room-srs@1.0.0`.
-- Rich-text formatting is not implemented; section notes are plain text.
-- The Figma AI panel is replaced with template guidance because real AI is outside this skeleton’s scope.
+- One fixed synthetic task is shared by all users.
+- The registry contains one template version.
+- Section notes are plain text; rich-text formatting is not implemented.
+- Template guidance replaces the design's AI panel because AI is outside this skeleton's scope.
 - This is a course running skeleton, not a production research system.
